@@ -1,72 +1,43 @@
-# Crypto Streaming Pipeline
+# 🚀 Crypto Streaming Pipeline
 
-```
-CoinGecko API → Kafka → Spark Structured Streaming → PostgreSQL → Streamlit
-                                    ↓
-                            Alerting (rules engine)
-```
+<p align="center">
+  <img src="https://img.shields.io/badge/Kafka-Streaming-black?logo=apachekafka">
+  <img src="https://img.shields.io/badge/Spark-Structured%20Streaming-orange?logo=apachespark">
+  <img src="https://img.shields.io/badge/PostgreSQL-Database-blue?logo=postgresql">
+  <img src="https://img.shields.io/badge/Streamlit-Dashboard-red?logo=streamlit">
+  <img src="https://img.shields.io/badge/Docker-Compose-blue?logo=docker">
+</p>
 
-## Structure
+<p align="center">
+  <b>Real-time crypto market data pipeline with alerting and dashboard</b>
+</p>
 
-```
-crypto-streaming/
-├── producer/
-│   ├── producer.py         # Fetches CoinGecko prices → Kafka
-│   ├── requirements.txt
-│   └── Dockerfile
-├── spark/
-│   ├── spark_streaming.py  # PySpark Structured Streaming
-│   ├── submit.sh           # spark-submit command
-│   └── Dockerfile
-├── streamlit/
-│   ├── app.py              # Dark dashboard
-│   ├── requirements.txt
-│   ├── .streamlit/config.toml
-│   └── Dockerfile
-├── postgres/
-│   └── init/
-│       └── 01_schema.sql   # crypto_prices + crypto_alerts tables
-└── docker-compose.yml
-```
+---
 
-## Start
+## 🧠 Overview
 
-```bash
-docker compose up --build
-```
+This project builds a **real-time cryptocurrency data pipeline** using modern data engineering tools.
 
-| Service    | URL                        |
-|------------|---------------------------|
-| Dashboard  | http://localhost:8501      |
-| PostgreSQL | localhost:5432 db=crypto   |
-| Kafka      | localhost:9094             |
+It ingests live crypto prices from the **CoinGecko API**, streams them through Kafka, processes them with Spark Structured Streaming, and stores results in PostgreSQL.
 
-## Alert Rules (in spark_streaming.py)
+👉 A dashboard (Streamlit) allows real-time monitoring and alerting.
 
-| Rule        | Condition                  | Description            |
-|-------------|----------------------------|------------------------|
-| DROP_24H    | change_24h_pct < -10       | Drop > 10% in 24h      |
-| SURGE_24H   | change_24h_pct > 15        | Surge > 15% in 24h     |
-| HIGH_VOLUME | volume_24h_usd > 50B       | Unusual 24h volume     |
-| BTC_CRASH   | price_usd < 20000          | BTC below $20,000      |
+---
 
-## Dashboard Tabs
+## 🏗️ Architecture
 
-- **💰 Live Prices** — latest tick per coin + 24h change bar chart
-- **📈 History** — price lines last 1h + volatility ranking
-- **🚨 Alerts** — alert log + rule summary + counts chart
-- **⚡ Spark Pipeline** — ingestion rate, tick count, raw data
+```mermaid
+flowchart LR
 
-## Add a custom alert rule
+    A[CoinGecko API] --> B[Kafka]
 
-Edit `spark/spark_streaming.py` → `ALERT_RULES` dict:
+    B --> C[Spark Structured Streaming]
 
-```python
-ALERT_RULES = {
-    "MY_RULE": ("price_usd", "> 100000", "BTC above $100k!"),
-    ...
-}
-```
+    C --> D[PostgreSQL]
 
-Then rebuild: `docker compose up --build spark`
-# Crypto-Streaming
+    C --> E[Alerting Engine]
+
+    D --> F[Streamlit Dashboard]
+
+    E --> F
+
