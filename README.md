@@ -22,6 +22,9 @@ It ingests live crypto prices from the **CoinGecko API**, streams them through K
 
 👉 A dashboard (Streamlit) allows real-time monitoring and alerting.
 
+<img width="958" height="467" alt="image" src="https://github.com/user-attachments/assets/a0753065-7ef6-4207-b62b-2c0fbce324d2" />
+
+
 ---
 
 ## 🏗️ Architecture
