@@ -1,0 +1,99 @@
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: crypto-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       crypto
+      POSTGRES_USER:     crypto
+      POSTGRES_PASSWORD: crypto
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crypto"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ── Kafka (KRaft mode, no Zookeeper) ────────────────────────────────────────
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: crypto-kafka
+    ports:
+      - "9092:9092"
+      - "9094:9094"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      CLUSTER_ID: "MkU3OEVBNTcwNTJENDM2Qk"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+
+  # ── Producer (CoinGecko → Kafka) ────────────────────────────────────────────
+  producer:
+    build: ./producer
+    container_name: crypto-producer
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP: "kafka:9092"
+      TOPIC: "crypto-prices"
+      FETCH_INTERVAL_SECONDS: "10"
+
+  # ── Spark Structured Streaming (Kafka → PostgreSQL) ─────────────────────────
+  spark:
+    build: ./spark
+    container_name: crypto-spark
+    restart: on-failure
+    depends_on:
+      kafka:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP: "kafka:9092"
+      TOPIC: "crypto-prices"
+      PG_URL: "jdbc:postgresql://postgres:5432/crypto"
+      PG_USER: "crypto"
+      PG_PASSWORD: "crypto"
+      CHECKPOINT_DIR: "/tmp/spark-checkpoints"
+    volumes:
+      - spark-checkpoints:/tmp/spark-checkpoints
+
+  # ── Streamlit Dashboard ─────────────────────────────────────────────────────
+  streamlit:
+    build: ./streamlit
+    container_name: crypto-streamlit
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8501:8501"
+    environment:
+      DB_DSN: "host=postgres port=5432 dbname=crypto user=crypto password=crypto"
+
+volumes:
+  pgdata:
+  spark-checkpoints:
